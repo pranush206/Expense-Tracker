@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { format } from "date-fns";
 import {
   CalendarDays,
   FileSpreadsheet,
@@ -16,6 +15,7 @@ import {
   CalendarRange,
   CalendarCheck,
   TrendingUp,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -33,6 +33,9 @@ import { AnalyticsPanel } from "@/components/expenses/analytics-panel";
 import { InsightsPanel } from "@/components/expenses/insights-panel";
 import { AlertStack, BudgetPanel, useBudgetAlerts } from "@/components/expenses/budget-panel";
 import { useTheme } from "@/components/theme-provider";
+import { useAuth } from "@/lib/auth/auth-context";
+import { AuthPage } from "@/components/auth/auth-page";
+import { UserProfileMenu } from "@/components/user-profile-menu";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -55,6 +58,7 @@ export const Route = createFileRoute("/")({
 });
 
 function Index() {
+  const { user, loading: authLoading } = useAuth();
   const { expenses, budgets, deleteExpense, hydrated } = useExpenses();
   const { theme, toggle } = useTheme();
   const [open, setOpen] = useState(false);
@@ -95,9 +99,48 @@ function Index() {
     }
   };
 
+  // 1. Loading State while Firebase Auth initializes
+  if (authLoading) {
+    return (
+      <div className="flex min-h-screen w-full flex-col items-center justify-center bg-background p-4">
+        <div className="glass-card animate-rise flex flex-col items-center gap-4 p-8 text-center max-w-sm w-full">
+          <div className="gradient-brand-bg flex h-14 w-14 items-center justify-center rounded-2xl text-primary-foreground shadow-[var(--shadow-glow)] animate-pulse">
+            <Wallet className="h-7 w-7" />
+          </div>
+          <div>
+            <h2 className="font-display text-lg font-bold">Student Expense Analyzer</h2>
+            <p className="text-xs text-muted-foreground">Checking authentication session...</p>
+          </div>
+          <Loader2 className="h-5 w-5 animate-spin text-primary mt-2" />
+        </div>
+      </div>
+    );
+  }
+
+  // 2. Unauthenticated State -> Show Auth Page
+  if (!user) {
+    return <AuthPage />;
+  }
+
+  // 3. Authenticated State -> Show Main Dashboard
   return (
     <main className="mx-auto min-h-screen w-full max-w-7xl px-4 py-6 sm:px-6 lg:py-10">
-      <header className="animate-rise flex flex-wrap items-center justify-end gap-2">
+      {/* Header Bar with Branding & Navigation Controls */}
+      <header className="animate-rise flex flex-wrap items-center justify-between gap-4 pb-2 border-b border-border/40">
+        <div className="flex items-center gap-3">
+          <div className="gradient-brand-bg flex h-10 w-10 items-center justify-center rounded-xl text-primary-foreground shadow-[var(--shadow-glow)]">
+            <Wallet className="h-5 w-5" />
+          </div>
+          <div>
+            <h1 className="font-display text-lg font-bold tracking-tight sm:text-xl">
+              Student Expense <span className="gradient-text">Analyzer Pro</span>
+            </h1>
+            <p className="text-xs text-muted-foreground hidden sm:block">
+              Welcome back, {user.displayName || user.email?.split("@")[0] || "Student"}
+            </p>
+          </div>
+        </div>
+
         <div className="flex shrink-0 items-center gap-2">
           <Button variant="outline" size="icon" aria-label="Toggle theme" onClick={toggle}>
             {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
@@ -116,6 +159,7 @@ function Index() {
           <Button onClick={openAdd} className="gradient-brand-bg text-primary-foreground shadow-[var(--shadow-glow)]">
             <Plus className="mr-1.5 h-4 w-4" /> Add expense
           </Button>
+          <UserProfileMenu />
         </div>
       </header>
 
@@ -257,7 +301,7 @@ function Index() {
       <ExpenseDialog open={open} onOpenChange={setOpen} editing={editing} />
 
       <footer className="mt-10 pb-16 text-center text-xs text-muted-foreground sm:pb-0">
-        Data is stored privately on this device · {expenses.length} expenses tracked
+        Data isolated & synced securely to your account · {expenses.length} expenses tracked
       </footer>
     </main>
   );

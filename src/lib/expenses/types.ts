@@ -13,6 +13,7 @@ export type Category = (typeof CATEGORIES)[number];
 
 export type Expense = {
   id: string;
+  userId?: string;
   title: string;
   category: Category;
   amount: number;
@@ -22,6 +23,7 @@ export type Expense = {
   time: string;
   notes?: string;
   createdAt: string;
+  updatedAt?: string;
 };
 
 export type Budgets = {

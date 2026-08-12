@@ -12,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "@/components/theme-provider";
+import { AuthProvider } from "@/lib/auth/auth-context";
 import { ExpenseProvider } from "@/lib/expenses/store";
 
 function NotFoundComponent() {
@@ -129,11 +130,14 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <ExpenseProvider>
-          <Outlet />
-          <Toaster position="top-right" richColors closeButton />
-        </ExpenseProvider>
+        <AuthProvider>
+          <ExpenseProvider>
+            <Outlet />
+            <Toaster position="top-right" richColors closeButton />
+          </ExpenseProvider>
+        </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );
 }
+
