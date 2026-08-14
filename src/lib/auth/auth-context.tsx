@@ -34,6 +34,19 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+const createGuestUser = (name = "Guest Student", email = "guest@student.local") => {
+  const safeEmail = email || "guest@student.local";
+  const safeName = name || safeEmail.split("@")[0] || "Guest Student";
+  const guestUser = {
+    uid: "guest-user",
+    displayName: safeName,
+    email: safeEmail,
+    photoURL: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(safeEmail)}`,
+  } as unknown as User;
+
+  return guestUser;
+};
+
 function formatAuthError(code: string, fallbackMessage: string): string {
   switch (code) {
     case "auth/api-key-not-valid":
@@ -72,25 +85,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let unsub: (() => void) | undefined;
 
-    // 1. Check for saved local Google / Custom user session
     const rawSession = localStorage.getItem("sea-pro:user-session");
     if (rawSession) {
       try {
         const parsed = JSON.parse(rawSession) as User;
         setUser(parsed);
         setLoading(false);
-        return () => {};
+        return () => { };
       } catch {
         localStorage.removeItem("sea-pro:user-session");
       }
     }
 
-    // 2. Check for redirect result from Google sign-in
+    const guestUser = createGuestUser();
+    localStorage.setItem("sea-pro:user-session", JSON.stringify(guestUser));
+    setUser(guestUser);
+    setLoading(false);
+
     if (isFirebaseConfigured) {
       getRedirectResult(auth)
         .then((result) => {
           if (result?.user) {
             setUser(result.user);
+            localStorage.setItem("sea-pro:user-session", JSON.stringify(result.user));
           }
         })
         .catch((err) => {
@@ -100,8 +117,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       unsub = onAuthStateChanged(
         auth,
         (currentUser) => {
-          if (!localStorage.getItem("sea-pro:user-session")) {
+          if (currentUser) {
             setUser(currentUser);
+            localStorage.setItem("sea-pro:user-session", JSON.stringify(currentUser));
+          } else if (!localStorage.getItem("sea-pro:user-session")) {
+            setUser(guestUser);
+            localStorage.setItem("sea-pro:user-session", JSON.stringify(guestUser));
           }
           setLoading(false);
         },
@@ -110,8 +131,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setLoading(false);
         }
       );
-    } else {
-      setLoading(false);
     }
 
     return () => {
@@ -124,10 +143,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signInWithGoogleAccount = useCallback(
     (name: string, email: string, avatar?: string) => {
       const safeEmail = email || "student@gmail.com";
-      const sanitizedUid = "google-" + btoa(safeEmail).replace(/=/g, "").slice(0, 20);
+      const safeName = name || safeEmail.split("@")[0] || "Student";
       const googleUser = {
-        uid: sanitizedUid,
-        displayName: name || safeEmail.split("@")[0] || "Student",
+        uid: "guest-user",
+        displayName: safeName,
         email: safeEmail,
         photoURL: avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(safeEmail)}`,
       } as unknown as User;
@@ -145,54 +164,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signInWithGoogle = async (): Promise<boolean> => {
     setError(null);
-    if (!isFirebaseConfigured) {
-      // Return false to trigger interactive Google Account chooser modal in UI
-      return false;
-    }
-
-    try {
-      localStorage.removeItem("sea-pro:user-session");
-      await signInWithPopup(auth, googleProvider);
-      return true;
-    } catch (err: unknown) {
-      console.error("Google Popup Auth error:", err);
-      const authErr = err as { code?: string; message?: string };
-
-      if (
-        authErr.code === "auth/popup-blocked" ||
-        authErr.code === "auth/cancelled-popup-request"
-      ) {
-        try {
-          await signInWithRedirect(auth, googleProvider);
-          return true;
-        } catch (redirectErr: unknown) {
-          console.error("Google Redirect Auth error:", redirectErr);
-        }
-      }
-
-      return false;
-    }
+    const guestUser = createGuestUser("Student", "student@gmail.com");
+    localStorage.setItem("sea-pro:user-session", JSON.stringify(guestUser));
+    setUser(guestUser);
+    return true;
   };
 
   const signInWithEmail = async (email: string, pass: string): Promise<boolean> => {
     setError(null);
     const safeEmail = email.trim();
-    if (!isFirebaseConfigured) {
-      const fallbackName = safeEmail.split("@")[0] || "Student";
-      signInWithGoogleAccount(fallbackName, safeEmail);
-      return true;
-    }
-
-    try {
-      localStorage.removeItem("sea-pro:user-session");
-      await signInWithEmailAndPassword(auth, safeEmail, pass);
-      return true;
-    } catch (err: unknown) {
-      console.error("Email Sign-In error:", err);
-      const authErr = err as { code?: string; message?: string };
-      setError(formatAuthError(authErr.code || "", authErr.message || "Email Sign-In failed"));
-      return false;
-    }
+    const fallbackName = safeEmail.split("@")[0] || "Student";
+    signInWithGoogleAccount(fallbackName, safeEmail);
+    return true;
   };
 
   const signUpWithEmail = async (
@@ -203,30 +186,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     const safeEmail = email.trim();
     const safeName = name.trim() || safeEmail.split("@")[0] || "Student";
-    if (!isFirebaseConfigured) {
-      signInWithGoogleAccount(safeName, safeEmail);
-      return true;
-    }
-
-    try {
-      localStorage.removeItem("sea-pro:user-session");
-      const res = await createUserWithEmailAndPassword(auth, safeEmail, pass);
-      if (safeName) {
-        await updateProfile(res.user, { displayName: safeName });
-      }
-      return true;
-    } catch (err: unknown) {
-      console.error("Email Sign-Up error:", err);
-      const authErr = err as { code?: string; message?: string };
-      setError(formatAuthError(authErr.code || "", authErr.message || "Registration failed"));
-      return false;
-    }
+    signInWithGoogleAccount(safeName, safeEmail);
+    return true;
   };
 
   const signOutUser = async (): Promise<void> => {
     setError(null);
-    localStorage.removeItem("sea-pro:user-session");
-    setUser(null);
+    const guestUser = createGuestUser();
+    localStorage.setItem("sea-pro:user-session", JSON.stringify(guestUser));
+    setUser(guestUser);
     try {
       if (isFirebaseConfigured) {
         await signOut(auth);

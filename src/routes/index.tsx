@@ -34,7 +34,6 @@ import { InsightsPanel } from "@/components/expenses/insights-panel";
 import { AlertStack, BudgetPanel, useBudgetAlerts } from "@/components/expenses/budget-panel";
 import { useTheme } from "@/components/theme-provider";
 import { useAuth } from "@/lib/auth/auth-context";
-import { AuthPage } from "@/components/auth/auth-page";
 import { UserProfileMenu } from "@/components/user-profile-menu";
 
 export const Route = createFileRoute("/")({
@@ -117,12 +116,6 @@ function Index() {
     );
   }
 
-  // 2. Unauthenticated State -> Show Auth Page
-  if (!user) {
-    return <AuthPage />;
-  }
-
-  // 3. Authenticated State -> Show Main Dashboard
   return (
     <main className="mx-auto min-h-screen w-full max-w-7xl px-4 py-6 sm:px-6 lg:py-10">
       {/* Header Bar with Branding & Navigation Controls */}
